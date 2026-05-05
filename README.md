@@ -177,7 +177,7 @@ If you use this code in your research, please cite:
 
 ```bibtex
 @misc{mcis2026,
-  author = {Your Name},
+  author = {Yoonseop Lee},
   title = {Maritime Conflict Intelligence System: AIS-Based Conflict Early Warning},
   year = {2026},
   publisher = {GitHub},
@@ -188,7 +188,7 @@ If you use this code in your research, please cite:
 
 ## 📧 Contact
 
-Your Name - your.email@example.com
+Your Name - iyunseob4@gmail.com
 
 Project Link: [https://github.com/Navy10021/ais-conflict-intelligence](https://github.com/Navy10021/ais-conflict-intelligence)
 
