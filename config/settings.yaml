@@ -64,3 +64,47 @@ models:
 logging:
   level: "INFO"
   format: "%(asctime)s %(levelname)s %(message)s"
+
+
+# Validation contracts
+validation:
+  cleaner_required_columns:
+    - mobile_type
+    - mmsi
+    - lat
+    - lon
+    - sog
+    - cog
+    - heading
+    - rot
+    - timestamp
+    - nav_status
+    - ship_type
+    - ant_bow
+    - ant_stern
+    - ant_port
+    - ant_starboard
+    - length
+    - width
+    - draught
+    - vessel_name
+    - imo
+    - callsign
+    - destination
+    - eta
+  feature_required_columns:
+    kinematic: [mmsi, timestamp, sog, cog, nav_status_code]
+    geospatial: [lat, lon]
+    rot: [mmsi, rot, sog, in_conflict_zone, delta_cog]
+    behavioral: [mmsi, timestamp, sog, rot_abs, cog, delta_cog, in_conflict_zone, nav_status_code]
+    destination: [mmsi, destination, eta_dt, timestamp]
+
+# Cleaning thresholds
+cleaning_thresholds:
+  sog_sentinel: 102.3
+  cog_sentinel: 360.0
+  heading_sentinel: 511
+  rot_min: -127.0
+  rot_max: 127.0
+  sog_implausible_knots: 50.0
+  timestamp_cutoff: '2010-01-01'

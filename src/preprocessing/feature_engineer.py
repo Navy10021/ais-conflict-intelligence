@@ -18,11 +18,29 @@ import logging
 import argparse
 from pathlib import Path
 from typing import Callable, Any
+import yaml
 
 logger = logging.getLogger(__name__)
 
 
 class AISFeatureEngineer:
+
+    def __init__(self, config_path: str = "config/settings.yaml"):
+        self.config = self._load_config(config_path)
+        self.required = self.config.get("validation", {}).get("feature_required_columns", {})
+
+    def _load_config(self, path: str) -> dict:
+        p = Path(path)
+        if not p.exists():
+            return {}
+        with p.open("r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+
+    def _require_columns(self, df: pd.DataFrame, key: str) -> None:
+        cols = set(self.required.get(key, []))
+        missing = sorted(cols - set(df.columns))
+        if missing:
+            raise ValueError(f"[{key}] Missing required columns: {missing}")
 
     CONFLICT_ZONES = {
         "black_sea":     {"bbox": [27.0, 40.5, 41.0, 46.8], "conflict": "ukraine_war"},
@@ -51,6 +69,7 @@ class AISFeatureEngineer:
 
     # ?? A. Kinematic Features ???????????????????????????????????????????????
     def add_kinematic_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        self._require_columns(df, "kinematic")
         """
         speed_category    : anchored / drifting / slow / cruising / fast
         delta_sog         : |SOG_t ??SOG_{t??}| per MMSI
@@ -90,6 +109,7 @@ class AISFeatureEngineer:
 
     # ?? B. Rate-of-Turn Features (NEW ??aisdk has ROT column) ???????????????
     def add_rot_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        self._require_columns(df, "rot")
         """
         ROT (deg/min) is available in aisdk ??critical for maneuver classification.
 
@@ -127,6 +147,7 @@ class AISFeatureEngineer:
 
     # ?? C. Geospatial Features ???????????????????????????????????????????????
     def add_geospatial_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        self._require_columns(df, "geospatial")
         """
         grid_cell         : 0.5째 횞 0.5째 cell ID
         in_conflict_zone  : bool ??inside any conflict zone
@@ -158,6 +179,7 @@ class AISFeatureEngineer:
 
     # ?? D. Behavioral Features ????????????????????????????????????????????????
     def add_behavioral_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        self._require_columns(df, "behavioral")
         """
         rolling_sog_mean_12h : 12-hour rolling mean SOG per MMSI
         rolling_sog_std_12h  : 12-hour rolling std SOG per MMSI
@@ -217,6 +239,7 @@ class AISFeatureEngineer:
     def add_destination_features(
         self, df: pd.DataFrame, ports_path: str
     ) -> pd.DataFrame:
+        self._require_columns(df, "destination")
         """
         Exploit the `destination` and `eta_dt` columns unique to aisdk.
 
@@ -228,9 +251,12 @@ class AISFeatureEngineer:
         """
         try:
             ports = pd.read_csv(ports_path)
-            conflict_ports = set(
-                ports.loc[ports["conflict_zone"] != "none", "locode"].str.upper()
-            )
+            required_port_cols = {"conflict_zone", "locode"}
+            missing_port_cols = required_port_cols - set(ports.columns)
+            if missing_port_cols:
+                logger.warning("Ports schema missing columns %s. Skipping destination features.", sorted(missing_port_cols))
+                return df
+            conflict_ports = set(ports.loc[ports["conflict_zone"] != "none", "locode"].astype(str).str.upper())
         except FileNotFoundError:
             logger.warning("Ports file not found: {ports_path}. Skipping destination features.")
             return df

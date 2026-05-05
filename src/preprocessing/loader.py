@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Iterator, Optional
 import logging
 import argparse
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,18 @@ class AISDKLoader:
         self.date_start = pd.Timestamp(date_start) if date_start else None
         self.date_end   = pd.Timestamp(date_end)   if date_end   else None
         self.chunksize  = chunksize
+        self._config_chunksize = self._load_chunksize_from_config()
+        if self.chunksize is None:
+            self.chunksize = self._config_chunksize
+
+    def _load_chunksize_from_config(self) -> Optional[int]:
+        config_path = Path("config/settings.yaml")
+        if not config_path.exists():
+            return None
+        with config_path.open("r", encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+        value = config.get("preprocessing", {}).get("chunksize")
+        return int(value) if value else None
 
     # ------------------------------------------------------------------ utils
     def _get_files(self) -> list[Path]:
@@ -107,13 +120,17 @@ class AISDKLoader:
         return files
 
     def _read_file(self, path: Path) -> pd.DataFrame:
-        """Read a single daily CSV with correct dtypes."""
-        # Read CSV without dtype to avoid conversion errors
-        df = pd.read_csv(
+        """Read a single daily CSV with optional chunk streaming."""
+        reader = pd.read_csv(
             path,
             low_memory=False,
             na_values=["Unknown", "Undefined", ""],
+            chunksize=self.chunksize,
         )
+        if self.chunksize:
+            df = pd.concat(reader, ignore_index=True)
+        else:
+            df = reader
         
         # Apply dtype only to columns that exist and can be converted
         for col, dtype in DTYPE_MAP.items():
