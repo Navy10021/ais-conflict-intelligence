@@ -1,18 +1,18 @@
-﻿"""
+"""
 AIS Data Cleaner (aisdk-specific)
 ===================================
 Cleaning steps ordered by computational cost (cheapest first):
 
-  1. Mobile type filter     ??keep only Class A and Class B vessels
-  2. MMSI validity          ??9-digit civilian range; flag specials
-  3. Coordinate validity    ??range + sentinel (91/181) removal
-  4. Kinematic sentinels    ??SOG=102.3, COG=360, Heading=511, ROT=NaN
-  5. Timestamp validity     ??future records, pre-2010 records
-  6. Nav status encoding    ??text ??integer code
-  7. Ship type encoding     ??text ??integer code
-  8. Dimension imputation   ??A+B ??Length, C+D ??Width when NaN
-  9. Missing value strategy ??per-column imputation
-  10. Deduplication         ??MMSI + timestamp
+  1. Mobile type filter     ->keep only Class A and Class B vessels
+  2. MMSI validity          ->9-digit civilian range; flag specials
+  3. Coordinate validity    ->range + sentinel (91/181) removal
+  4. Kinematic sentinels    ->SOG=102.3, COG=360, Heading=511, ROT=NaN
+  5. Timestamp validity     ->future records, pre-2010 records
+  6. Nav status encoding    ->text ->integer code
+  7. Ship type encoding     ->text ->integer code
+  8. Dimension imputation   ->A+B ->Length, C+D ->Width when NaN
+  9. Missing value strategy ->per-column imputation
+  10. Deduplication         ->MMSI + timestamp
 """
 import pandas as pd
 import numpy as np
@@ -75,7 +75,7 @@ class AISCleaner:
         n = len(df)
         df = df[df["mobile_type"].isin(KEEP_MOBILE_TYPES)].copy()
         self.report["base_station_aton_removed"] = n - len(df)
-        logger.info("Mobile type filter: removed {n - len(df):,} records")
+        logger.info("Mobile type filter: removed %d records", n - len(df))
         return df
 
     # ?? 2. MMSI validity ????????????????????????????????????????????????????
@@ -83,7 +83,7 @@ class AISCleaner:
         n = len(df)
         df = df[df["mmsi"].between(200_000_000, 799_999_999)].copy()
         self.report["mmsi_removed"] = n - len(df)
-        logger.info("MMSI filter: removed {n - len(df):,} records")
+        logger.info("MMSI filter: removed %d records", n - len(df))
         return df
 
     # ?? 3. Coordinate validity ??????????????????????????????????????????????
@@ -96,15 +96,15 @@ class AISCleaner:
             df["lat"].notna() & df["lon"].notna()
         ].copy()
         self.report["coord_removed"] = n - len(df)
-        logger.info("Coordinate filter: removed {n - len(df):,} records")
+        logger.info("Coordinate filter: removed %d records", n - len(df))
         return df
 
-    # ?? 4. Kinematic sentinels ??NaN ????????????????????????????????????????
+    # ?? 4. Kinematic sentinels ->NaN ????????????????????????????????????????
     def clean_kinematics(self, df: pd.DataFrame) -> pd.DataFrame:
         df["sog"]     = df["sog"].where(df["sog"]     < 102.3, np.nan)
         df["cog"]     = df["cog"].where(df["cog"]     < 360.0, np.nan)
         df["heading"] = df["heading"].where(df["heading"] < 511,  np.nan)
-        # ROT: valid range ??27 to +127 deg/min; flag implausible
+        # ROT: valid range ->27 to +127 deg/min; flag implausible
         df["rot"]     = df["rot"].where(df["rot"].between(-127.0, 127.0), np.nan)
         df["sog_implausible"] = (df["sog"] > 50.0).astype("int8")
         return df
@@ -142,8 +142,8 @@ class AISCleaner:
     def impute_dimensions_from_antenna(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         AIS Message Type 5 encodes antenna reference position offsets:
-          A = bow to antenna,  B = stern to antenna  ??Length = A + B
-          C = port to antenna, D = starboard to antenna ??Width = C + D
+          A = bow to antenna,  B = stern to antenna  ->Length = A + B
+          C = port to antenna, D = starboard to antenna ->Width = C + D
         Use these to impute missing Length/Width.
         """
         computed_length = (df["ant_bow"].fillna(0) + df["ant_stern"].fillna(0))
@@ -162,8 +162,8 @@ class AISCleaner:
         """
         Per-column strategy:
           vessel_name / imo / callsign : fillna("UNKNOWN") already from loader
-          ship_type_code               : per-MMSI mode ??0 (Unknown)
-          length / width / draught     : per-MMSI median ??per-ship_type median
+          ship_type_code               : per-MMSI mode ->0 (Unknown)
+          length / width / draught     : per-MMSI median ->per-ship_type median
           destination / eta            : retain NaN (used in route analysis)
           nav_status_code              : 15 (Unknown) as default
         """
@@ -176,7 +176,7 @@ class AISCleaner:
         )
         df["ship_type_code"] = df["ship_type_code"].fillna(type_mode).fillna(0)
 
-        # Dimensions: per-MMSI median ??per ship_type median
+        # Dimensions: per-MMSI median ->per ship_type median
         for col in ["length", "width", "draught"]:
             # Handle empty groups by using transform with proper NaN handling
             df[col] = df.groupby("mmsi")[col].transform(
@@ -197,12 +197,12 @@ class AISCleaner:
         n = len(df)
         df = df.drop_duplicates(subset=["mmsi", "timestamp"], keep="first")
         self.report["duplicates_removed"] = n - len(df)
-        logger.info("Deduplication: removed {n - len(df):,} records")
+        logger.info("Deduplication: removed %d records", n - len(df))
         return df
 
     # ?? Pipeline runner ?????????????????????????????????????????????????????
     def run(self, df: pd.DataFrame) -> pd.DataFrame:
-        logger.info("Input: {len(df):,} records")
+        logger.info("Input: %d records", len(df))
         df = self.filter_mobile_type(df)
         df = self.filter_mmsi(df)
         df = self.filter_coordinates(df)
@@ -215,8 +215,8 @@ class AISCleaner:
         df = self.deduplicate(df)
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(self.output_path, index=False, compression="snappy")
-        logger.info("Clean records: {len(df):,} ??{self.output_path}")
-        logger.info("Report: {self.report}")
+        logger.info("Clean records: %d -> %s", len(df), self.output_path)
+        logger.info("Report: %s", self.report)
         return df
 
 
@@ -234,12 +234,12 @@ def main():
     )
 
     df = pd.read_parquet(args.input)
-    logger.info("Loaded {len(df):,} records from {args.input}")
+    logger.info("Loaded %d records from %s", len(df), args.input)
 
     cleaner = AISCleaner(output_path=args.output)
     df_clean = cleaner.run(df)
 
-    print(f"Cleaned {len(df_clean):,} records ??{args.output}")
+    print(f"Cleaned {len(df_clean):,} records -> {args.output}")
     print(f"Cleaning report: {cleaner.report}")
 
 
