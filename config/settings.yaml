@@ -1,0 +1,66 @@
+# MCIS Configuration File
+# Paths
+paths:
+  data_root: "./data"
+  data_external: "./data_external"
+  output_root: "./outputs"
+  processed: "./outputs/processed"
+  figures: "./outputs/figures"
+  tables: "./outputs/tables"
+  models: "./outputs/models"
+  reports: "./outputs/reports"
+
+# Date range for data loading
+date_range:
+  start: "2024-03-01"
+  end: "2024-08-31"
+
+# Conflict zones (bbox: [lon_min, lat_min, lon_max, lat_max])
+conflict_zones:
+  north_sea:
+    bbox: [-5.0, 51.0, 10.0, 58.0]
+    conflict: "none"
+  baltic_sea:
+    bbox: [10.0, 54.0, 30.0, 65.0]
+    conflict: "none"
+  black_sea:
+    bbox: [27.0, 40.5, 41.0, 46.8]
+    conflict: "ukraine_war"
+  red_sea:
+    bbox: [32.0, 12.0, 43.5, 30.0]
+    conflict: "houthi_crisis"
+
+# Chokepoints (lon, lat)
+chokepoints:
+  hormuz: [56.50, 26.50]
+  malacca: [103.80, 1.20]
+  bab_mandeb: [43.40, 12.50]
+  suez: [32.50, 30.70]
+  danish_straits: [12.60, 55.70]
+  skagerrak: [9.50, 57.80]
+
+# Preprocessing parameters
+preprocessing:
+  chunksize: null
+  grid_size: 0.5  # degrees for grid_cell
+  time_bucket: "6H"  # 6-hour buckets
+
+# Model parameters
+models:
+  lstm:
+    input_dim: 20
+    hidden_dim: 128
+    num_layers: 2
+    num_heads: 4
+    dropout: 0.3
+  training:
+    seed: 42
+    batch_size: 32
+    learning_rate: 0.001
+    epochs: 100
+  horizons: [3, 7, 14, 30]  # T+days
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s %(levelname)s %(message)s"
