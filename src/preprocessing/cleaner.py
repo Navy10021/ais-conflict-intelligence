@@ -19,6 +19,7 @@ import numpy as np
 from pathlib import Path
 import logging
 import argparse
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,21 @@ class AISCleaner:
     def __init__(self, output_path: str = "outputs/processed/ais_clean.parquet"):
         self.output_path = Path(output_path)
         self.report: dict = {}
+        self.config = self._load_config()
+        self.thresholds = self.config.get("cleaning_thresholds", {})
+        self.required_columns = set(self.config.get("validation", {}).get("cleaner_required_columns", []))
+
+    def _load_config(self) -> dict:
+        config_path = Path("config/settings.yaml")
+        if not config_path.exists():
+            return {}
+        with config_path.open("r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+
+    def _validate_columns(self, df: pd.DataFrame, stage: str) -> None:
+        missing = sorted(self.required_columns - set(df.columns))
+        if missing:
+            raise ValueError(f"[{stage}] Missing required columns: {missing}")
 
     # ?? 1. Mobile type filter ???????????????????????????????????????????????
     def filter_mobile_type(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -101,12 +117,19 @@ class AISCleaner:
 
     # ?? 4. Kinematic sentinels ->NaN ????????????????????????????????????????
     def clean_kinematics(self, df: pd.DataFrame) -> pd.DataFrame:
-        df["sog"]     = df["sog"].where(df["sog"]     < 102.3, np.nan)
-        df["cog"]     = df["cog"].where(df["cog"]     < 360.0, np.nan)
-        df["heading"] = df["heading"].where(df["heading"] < 511,  np.nan)
+        sog_sentinel = float(self.thresholds.get("sog_sentinel", 102.3))
+        cog_sentinel = float(self.thresholds.get("cog_sentinel", 360.0))
+        heading_sentinel = float(self.thresholds.get("heading_sentinel", 511))
+        rot_min = float(self.thresholds.get("rot_min", -127.0))
+        rot_max = float(self.thresholds.get("rot_max", 127.0))
+        sog_implausible = float(self.thresholds.get("sog_implausible_knots", 50.0))
+
+        df["sog"]     = df["sog"].where(df["sog"]     < sog_sentinel, np.nan)
+        df["cog"]     = df["cog"].where(df["cog"]     < cog_sentinel, np.nan)
+        df["heading"] = df["heading"].where(df["heading"] < heading_sentinel,  np.nan)
         # ROT: valid range ->27 to +127 deg/min; flag implausible
-        df["rot"]     = df["rot"].where(df["rot"].between(-127.0, 127.0), np.nan)
-        df["sog_implausible"] = (df["sog"] > 50.0).astype("int8")
+        df["rot"]     = df["rot"].where(df["rot"].between(rot_min, rot_max), np.nan)
+        df["sog_implausible"] = (df["sog"] > sog_implausible).astype("int8")
         return df
 
     # ?? 5. Timestamp validity ???????????????????????????????????????????????
@@ -114,10 +137,10 @@ class AISCleaner:
         # Handle both timezone-aware and naive timestamps
         if df["timestamp"].dt.tz is not None:
             now = pd.Timestamp.now(tz="UTC")
-            cutoff = pd.Timestamp("2010-01-01", tz="UTC")
+            cutoff = pd.Timestamp(self.thresholds.get("timestamp_cutoff", "2010-01-01"), tz="UTC")
         else:
             now = pd.Timestamp.now()
-            cutoff = pd.Timestamp("2010-01-01")
+            cutoff = pd.Timestamp(self.thresholds.get("timestamp_cutoff", "2010-01-01"))
         n = len(df)
         df = df[df["timestamp"].between(cutoff, now) & df["timestamp"].notna()].copy()
         self.report["timestamp_removed"] = n - len(df)
@@ -202,6 +225,7 @@ class AISCleaner:
 
     # ?? Pipeline runner ?????????????????????????????????????????????????????
     def run(self, df: pd.DataFrame) -> pd.DataFrame:
+        self._validate_columns(df, "run")
         logger.info("Input: %d records", len(df))
         df = self.filter_mobile_type(df)
         df = self.filter_mmsi(df)
@@ -245,4 +269,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
