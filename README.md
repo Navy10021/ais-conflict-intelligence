@@ -1,199 +1,224 @@
 # Maritime Conflict Intelligence System (MCIS)
 
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Status: Alpha](https://img.shields.io/badge/Status-Alpha-orange)](pyproject.toml)
 
-A comprehensive system for detecting maritime behavioral anomalies correlated with armed conflicts using AIS (Automatic Identification System) data from the Danish Maritime Authority.
+> **AIS(선박자동식별장치) 데이터 기반 해상 이상행동 탐지 및 분쟁 조기경보 연구 프레임워크**
 
-## 🎯 Mission
+MCIS는 대규모 AIS 시계열 데이터에서 선박 행동 변화를 추출하고, 무력 분쟁 발생 시점과의 상관·선행 신호를 분석해 **“해상 교통 변화가 분쟁의 전조가 될 수 있는가?”**를 검증하는 연구/엔지니어링 프로젝트입니다.
 
-Process, analyze, and model AIS data to detect maritime behavioral anomalies correlated with armed conflicts and build a predictive early-warning system at publication quality.
+---
 
-**Core Research Question:**
-> "Do maritime behavioral signals — traffic density, vessel-type composition, speed deviation, AIS silence, rate of turn, and route entropy — exhibit statistically significant changes before and after armed conflict onset? Can a temporal model exploit these leading indicators to predict conflict events in advance?"
+## ✨ Why MCIS?
+
+- **End-to-end 파이프라인**: 적재 → 정제 → 피처 생성 → 집계 → 분석 → 시각화 → 모델링.
+- **분쟁 맥락 반영 피처**: AIS silence, ROT 급변, 항로 엔트로피, 군용/민간 비율 등 행동 기반 신호.
+- **재현 가능한 연구 구조**: 설정 파일 기반(`config/settings.yaml`) + 모듈형 CLI + 테스트 코드.
+- **논문 지향 설계**: Event Study, ITS, Granger, DiD 등 통계 분석과 예측 모델링을 함께 구성.
+
+---
+
+## 🎯 Core Research Question
+
+> “선박 트래픽 밀도, 선종 구성비, 속도/침로 변동성, AIS silence, ROT 이상치, 항로 엔트로피 같은 해상 행동 신호가 분쟁 발생 전후 유의미하게 변화하는가? 또한 이 신호를 이용해 분쟁 이벤트를 사전에 예측할 수 있는가?”
+
+---
 
 ## 🌍 Target Conflict Zones
 
 | Conflict | Onset | Key Zone |
-|----------|-------|----------|
+|---|---:|---|
 | Russia–Ukraine War | 2022-02-24 | Black Sea, Sea of Azov, Kerch Strait |
 | Red Sea / Houthi Crisis | 2023-11-19 | Red Sea, Gulf of Aden, Bab-el-Mandeb |
 | Taiwan Strait Tensions | 2022-08-04 | Taiwan Strait |
 | South China Sea Disputes | Ongoing | SCS, Paracel & Spratly Islands |
 | Iran–Gulf Tensions | Ongoing | Strait of Hormuz |
 
-## 📁 Project Structure
+---
 
+## 🧱 System Architecture
+
+```text
+Raw AIS CSV (daily)
+    ↓
+[Loader] 날짜 범위 로딩
+    ↓
+[Cleaner] 품질/물리 제약 기반 정제
+    ↓
+[Feature Engineer] 행동/지리/목적지 피처 생성
+    ↓
+[Aggregator] Grid × Time bucket 집계
+    ↓
+┌───────────────┬───────────────────┬────────────────────┐
+│ Visualization │ Statistical Analysis│ Predictive Modeling │
+└───────────────┴───────────────────┴────────────────────┘
 ```
+
+---
+
+## 📦 Project Layout
+
+```bash
 ais-conflict-intelligence/
-├── config/                    # Configuration files
-│   └── settings.yaml
-├── data/                      # Raw AIS data (not committed)
-│   └── YYYY-MM-DD/
-│       └── aisdk-YYYY-MM-DD.csv
-├── data_external/             # External datasets (not committed)
-├── data_sample/               # Sample data for testing
-├── notebooks/                 # Jupyter notebooks for EDA and analysis
-│   ├── 01_EDA.ipynb
-│   ├── 02_preprocessing_validation.ipynb
-│   ├── 03_visualization.ipynb
-│   ├── 04_conflict_correlation.ipynb
-│   └── 05_model_development.ipynb
-├── outputs/                   # Generated outputs (not committed)
-├── scripts/                   # Pipeline scripts
+├── config/settings.yaml
+├── data/                     # AIS 원천 데이터(일자 폴더)
+├── data_external/            # ACLED, world_ports 등 외부 데이터
+├── docs/report.md
+├── notebooks/                # EDA/검증/시각화/상관/모델링
+├── scripts/
+│   ├── run_pipeline.py
 │   ├── run_pipeline.sh
-│   └── run_pipeline.py
-├── src/                       # Source code
-│   ├── preprocessing/         # Data loading, cleaning, feature engineering
-│   ├── visualization/         # Spatial, temporal, and statistical viz
-│   ├── analysis/              # Correlation and behavioral analysis
-│   └── models/               # Anomaly detection and conflict prediction
-├── tests/                     # Unit tests
-├── requirements.txt           # Python dependencies
-├── pyproject.toml            # Package configuration
-├── README.md
-├── LICENSE
-└── .gitignore
+│   └── generate_report.py
+├── src/
+│   ├── preprocessing/        # loader, cleaner, feature_engineer, aggregator
+│   ├── visualization/        # spatial/temporal/statistical/conflict overlay
+│   ├── analysis/             # traffic/behavioral/correlation/ROT/destination
+│   └── models/               # anomaly, predictor, baseline, evaluator
+└── tests/                    # unit tests
 ```
+
+---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- Python 3.11+
-- pip or conda
-
-### Installation
+### 1) Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/Navy10021/ais-conflict-intelligence.git
 cd ais-conflict-intelligence
 
-# Create virtual environment (recommended)
-conda create -n mcis python=3.11 -y
-conda activate mcis
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install dependencies
 pip install -e .
 ```
 
-### Data Setup
+> 선택 설치 예시: `pip install -e .[dev,viz,ml,forecasting,notebooks]`
 
-1. Download AIS data from [Danish Maritime Authority](https://www.dma.dk/)
-2. Place data in `data/YYYY-MM-DD/aisdk-YYYY-MM-DD.csv` format
-3. (Optional) Add external datasets to `data_external/`
+### 2) Data Setup
 
-### Running the Pipeline
+1. Danish Maritime Authority AIS 데이터를 확보합니다.
+2. 아래 형태로 저장합니다.
+   - `data/YYYY-MM-DD/aisdk-YYYY-MM-DD.csv`
+3. 외부 데이터(ACLED, ports)를 `data_external/`에 배치합니다.
+   - `data_external/acled_events.csv`
+   - `data_external/world_ports.csv`
+
+### 3) Run Full Pipeline
 
 ```bash
-# Full pipeline (Linux/Mac)
+# Bash wrapper
 bash scripts/run_pipeline.sh
 
-# Full pipeline (Cross-platform Python)
-python scripts/run_pipeline.py
-
-# Individual steps
-python -m src.preprocessing.loader --data-root ./data --output outputs/processed/ais_raw.parquet --verbose
-python -m src.preprocessing.cleaner --input outputs/processed/ais_raw.parquet --output outputs/processed/ais_clean.parquet --verbose
-python -m src.preprocessing.feature_engineer --input outputs/processed/ais_clean.parquet --output outputs/processed/ais_features.parquet --verbose
+# Cross-platform Python CLI
+python scripts/run_pipeline.py --date-start 2024-03-01 --date-end 2024-08-31 --verbose
 ```
 
-## 📊 Features
+### 4) Run by Stage (CLI Modules)
 
-### Preprocessing Pipeline
-- **Loader**: Multi-day AIS data loading with date filtering
-- **Cleaner**: Data validation, coordinate filtering, MMSI validation, missing value imputation
-- **Feature Engineer**: 6 categories of features (Kinematic, ROT, Geospatial, Behavioral, Destination/ETA, Temporal Aggregation)
-- **Aggregator**: Grid-cell × time-bucket aggregation
+```bash
+python -m src.preprocessing.loader --data-root ./data --output outputs/processed/ais_raw.parquet --verbose
+python -m src.preprocessing.cleaner --input outputs/processed/ais_raw.parquet --output outputs/processed/ais_clean.parquet --verbose
+python -m src.preprocessing.feature_engineer --input outputs/processed/ais_clean.parquet --output outputs/processed/ais_features.parquet --conflict-events data_external/acled_events.csv --ports data_external/world_ports.csv --verbose
+python -m src.preprocessing.aggregator --input outputs/processed/ais_features.parquet --output outputs/processed/ais_aggregated.parquet --verbose
+```
 
-### Analysis Modules
-- **Traffic Analyzer**: Volume and density analysis
-- **Behavioral Analyzer**: Vessel behavior pattern analysis
-- **Correlation Analyzer**: Granger causality, DiD, ITS, Event Study
-- **ROT Analyzer**: Rate-of-Turn anomaly analysis
-- **Destination Analyzer**: Port call and destination analysis
+---
+
+## 🧠 Feature Space (Examples)
+
+| Category | Representative Features |
+|---|---|
+| Kinematic | `delta_sog`, `delta_cog`, `speed_category`, `sog_z_score` |
+| ROT / Maneuver | `rot_abs`, `rot_spike`, `evasive_maneuver` |
+| Geospatial | `grid_cell`, `in_conflict_zone`, `dist_chokepoint_km` |
+| Behavioral | `route_entropy`, `loitering_flag`, `zig_zag_index` |
+| Destination/ETA | `dest_changed`, `dest_is_conflict_port`, `eta_hours_remaining` |
+| Temporal Aggregation | `traffic_count`, `military_ratio`, `dark_ship_ratio` |
+
+---
+
+## 📊 Analysis & Modeling Modules
+
+### Analysis
+- `traffic_analyzer`: 교통량/밀도/구성 변화 분석
+- `behavioral_analyzer`: 행동 패턴·이상행동 시그널 분석
+- `correlation_analyzer`: Granger, DiD, ITS, Event Study 기반 상관/인과 탐색
+- `rot_analyzer`: 급선회/회피기동 관련 이상 시그널
+- `destination_analyzer`: 목적지·입출항·ETA 기반 경로 변화
 
 ### Models
-- **Anomaly Detection**: Isolation Forest, VAE, DBSCAN, LOF
-- **Conflict Predictor**: LSTM-Attention, TFT, XGBoost, ARIMA/Prophet baselines
+- `anomaly_model`: Isolation Forest, DBSCAN, LOF 등 이상탐지 접근
+- `conflict_predictor`: 시계열 기반 분쟁 예측 모델 학습 파이프라인
+- `baseline`: 비교 기준선 모델
+- `evaluator`: 성능 평가 지표/리포팅
 
-## 📈 Key Features Generated
-
-| Category | Features |
-|----------|-----------|
-| Kinematic | speed_category, delta_sog, delta_cog, is_dark_ship, sog_z_score |
-| ROT | rot_category, rot_abs, rot_spike, evasive_maneuver |
-| Geospatial | grid_cell, in_conflict_zone, dist_chokepoint_km |
-| Behavioral | route_entropy, loitering_flag, zig_zag_index, rolling statistics |
-| Destination | dest_is_conflict_port, eta_hours_remaining, dest_changed |
-| Temporal Agg | traffic_count, military_ratio, dark_ship_ratio, mean_rot_abs |
+---
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
 pytest tests/
-
-# Run specific test
 pytest tests/test_loader.py -v
 ```
 
-## 📖 Documentation
+---
 
-Detailed documentation is available in the `notebooks/` directory:
-- `01_EDA.ipynb`: Exploratory Data Analysis
-- `02_preprocessing_validation.ipynb`: Preprocessing validation
-- `03_visualization.ipynb`: Visualization examples
-- `04_conflict_correlation.ipynb`: Correlation analysis
-- `05_model_development.ipynb`: Model development and evaluation
+## 📚 Documentation
 
-## 📄 Paper Structure
+- `notebooks/01_EDA.ipynb` — 데이터 탐색
+- `notebooks/02_preprocessing_validation.ipynb` — 전처리 검증
+- `notebooks/03_visualization.ipynb` — 시각화
+- `notebooks/04_conflict_correlation.ipynb` — 상관/이벤트 분석
+- `notebooks/05_model_development.ipynb` — 모델링/평가
+- `docs/report.md` — 산출물 리포트 초안
 
-```
-Title: "Maritime Traffic Anomaly Detection as a Precursor to Armed Conflict:
-        Evidence from AIS Data in Global Hotspots (2022–2026)"
-```
+---
 
-See `CLAUDE.md` for detailed paper structure and methodology.
+## 🛠️ Configuration Highlights
+
+주요 실행 파라미터는 `config/settings.yaml`에서 관리합니다.
+
+- 데이터 경로, 출력 경로
+- 분석 기간 (`date_range`)
+- 분쟁 구역 bbox 및 chokepoint 좌표
+- 전처리 단위(`grid_size`, `time_bucket`)
+- 학습 하이퍼파라미터
+- 정제/검증 임계값
+
+---
+
+## 🗺️ Output Convention
+
+기본 출력 루트는 `./outputs` 입니다.
+
+- `outputs/processed/`: parquet 중간 산출물
+- `outputs/figures/`: 시각화 결과
+- `outputs/tables/`: 통계 테이블
+- `outputs/models/`: 모델 아티팩트
+- `outputs/reports/`: 리포트 파일
+
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+PR을 환영합니다.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Fork
+2. Feature branch 생성
+3. 변경/테스트
+4. Commit & Push
+5. Pull Request 생성
+
+---
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📚 Citation
-
-If you use this code in your research, please cite:
-
-```bibtex
-@misc{mcis2026,
-  author = {Yoonseop Lee},
-  title = {Maritime Conflict Intelligence System: AIS-Based Conflict Early Warning},
-  year = {2026},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/Navy10021/ais-conflict-intelligence}}
-}
-```
+MIT License. 자세한 내용은 [LICENSE](LICENSE)를 참고하세요.
 
 ## 📧 Contact
 
-Your Name - iyunseob4@gmail.com
-
-Project Link: [https://github.com/Navy10021/ais-conflict-intelligence](https://github.com/Navy10021/ais-conflict-intelligence)
-
-## 🙏 Acknowledgments
-
-- Danish Maritime Authority for providing AIS data
-- ACLED for conflict event data
-- World Port Index for port location data
+- Author: Yoonseop Lee
+- Email: iyunseob4@gmail.com
+- Project: https://github.com/Navy10021/ais-conflict-intelligence
