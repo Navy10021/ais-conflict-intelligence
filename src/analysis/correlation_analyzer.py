@@ -78,7 +78,7 @@ class CorrelationAnalyzer:
         data = agg[["feature_val", "conflict_val"]].values
 
         try:
-            result = grangercausalitytests(data, maxlag=max_lag, verbose=False)
+            result = grangercausalitytests(data, maxlag=max_lag)
             p_values = {lag: result[lag][0]["ssr_ftest"][1] for lag in result.keys()}
             min_p = min(p_values.values())
             best_lag = [k for k, v in p_values.items() if v == min_p][0]
@@ -402,6 +402,10 @@ def main():
     )
 
     df = pd.read_parquet(args.input)
+    if df["timestamp"].dt.tz is not None:
+        df["timestamp"] = df["timestamp"].dt.tz_localize(None)
+    if "time_bucket" in df.columns and df["time_bucket"].dt.tz is not None:
+        df["time_bucket"] = df["time_bucket"].dt.tz_localize(None)
     logger.info("Loaded {len(df):,} records from {args.input}")
 
     analyzer = CorrelationAnalyzer(output_dir=args.output)
